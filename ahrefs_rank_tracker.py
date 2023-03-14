@@ -1,4 +1,5 @@
 #! /usr/bin/env python
+import base64
 from collections import Counter
 import datetime
 import shutil
@@ -14,7 +15,6 @@ from functools import reduce
 import tldextract
 import streamlit as st
 import random
-from zipfile import ZipFile
 
 
 def rename_csv_files(folder_path):
@@ -60,6 +60,8 @@ def add_folder_name_to_csv(folder_path):
                 df = pd.read_csv(file_path, sep="\t", encoding="utf-16")
                 folder_name = os.path.basename(root)
                 df["date_scraped"] = folder_name
+                # strip from column "position" all non-numeric characters
+                df["Position"] = df["Position"].str.replace("[^0-9]", "")
                 df.to_csv(file_path, index=False, sep="\t", encoding="utf-16")
 
 
@@ -158,7 +160,7 @@ def important_dates_filter(project_df, max_dates):
     unique_dates = project_df["date_scraped"].unique()
 
     #  extract the unique "date_scraped" values
-    unique_dates = calculate_days_between_dates(unique_dates, 10)
+    unique_dates = calculate_days_between_dates(unique_dates, 6)
 
     # only keep the first 3 elements in the list, if there are more than 3 elements
     if len(unique_dates) > max_dates:
@@ -207,7 +209,7 @@ def create_project_reports(folder_path, project_list):
     for project in project_list:
         project_df = merge_csv_files(folder_path, project)
         # print(project_df, "project_df===")
-        project_df = important_dates_filter(project_df, 3)
+        project_df = important_dates_filter(project_df, 6)
         project_df = pivot_rank_tracker(project_df)
         # go to up a level and create a folder called "projects" if it doesn't exist
         os.makedirs(os.path.join(folder_path, "projects"), exist_ok=True)
@@ -252,14 +254,20 @@ def main_loop(
         create_project_reports(folder_path, project_list)
 
 
+@st.cache_resource
+def convert_df(df):
+    # IMPORTANT: Cache the conversion to prevent computation on every rerun
+    return df.to_csv().encode("utf-16")
+
+
 def main(data_dir):
     # Set up the app title and description
-    st.title("Ahrefs Rank Tracker CSV Processor")
-    st.markdown(
-        "This app processes Ahrefs Rank Tracker CSV files and generates project reports."
-    )
+    # st.title("Ahrefs Rank Tracker Reports")
+    # st.markdown(
+    #     "This app processes Ahrefs Rank Tracker CSV files and generates project reports."
+    # )
     # Use file_uploader to get the uploaded zip file
-    zip_file = st.file_uploader("Upload a zip file", type="zip")
+    zip_file = st.sidebar.file_uploader("Upload a zip file", type="zip")
 
     main_loop(zip_file, data_dir)
 
@@ -281,5 +289,14 @@ if __name__ == "__main__":
                 sep="\t",
                 encoding="utf-16",
             )
-            st.header(selected_project)
+            st.header(f"Project: {selected_project.capitalize()}")
             st.dataframe(project_df)
+
+            # Create a download button
+            csv = convert_df(project_df)
+            st.download_button(
+                label="Download data as CSV",
+                data=csv,
+                file_name=f"{selected_project}.csv",
+                mime="text/csv",
+            )
