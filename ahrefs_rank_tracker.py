@@ -60,8 +60,10 @@ def add_folder_name_to_csv(folder_path):
                 df = pd.read_csv(file_path, sep="\t", encoding="utf-16")
                 folder_name = os.path.basename(root)
                 df["date_scraped"] = folder_name
+                # convert "date_scraped" column to datetime
+                df["date_scraped"] = pd.to_datetime(df["date_scraped"])
                 # strip from column "position" all non-numeric characters
-                df["Position"] = df["Position"].str.replace("[^0-9]", "")
+                df["Position"] = df["Position"].str.replace(r"\D", "", regex=True)
                 df.to_csv(file_path, index=False, sep="\t", encoding="utf-16")
 
 
@@ -140,8 +142,9 @@ def calculate_days_between_dates(dates, max_diff):
 
     while i < len(dates) - 1:
         # Calculate the number of days between consecutive dates
-        diff = (dates[i] - dates[i + 1]).days
-
+        print("first date: ", dates[i], "second date: ", dates[i + 1], "diff:")
+        diff = abs((dates[i] - dates[i + 1]).days)
+        print(diff)
         # If the difference is less than the maximum allowed difference, remove the second date and recalculate
         if diff < max_diff:
             dates = np.delete(dates, i + 1)
@@ -158,13 +161,16 @@ def calculate_days_between_dates(dates, max_diff):
 def important_dates_filter(project_df, max_dates):
     # extract the unique "date_scraped" values
     unique_dates = project_df["date_scraped"].unique()
+    print(unique_dates)
 
     #  extract the unique "date_scraped" values
-    unique_dates = calculate_days_between_dates(unique_dates, 6)
+    unique_dates = calculate_days_between_dates(unique_dates, 5)
+
+    print(unique_dates)
 
     # only keep the first 3 elements in the list, if there are more than 3 elements
-    if len(unique_dates) > max_dates:
-        unique_dates = unique_dates[:max_dates]
+    # if len(unique_dates) > max_dates:
+    #     unique_dates = unique_dates[:max_dates]
 
     # filter the dataframe to only in column date_scraped valuest from unique_dates
     project_df = project_df[project_df["date_scraped"].isin(unique_dates)]
