@@ -30,7 +30,7 @@ To use this script, follow these steps:
    pip install -r requirements.txt
    ```
 
-4. Place your Ahrefs Rank Tracker CSV files in the `data/ahrefs/rank_tracker` folder.
+4. Upload your Ahrefs Rank Tracker CSV files.
 5. Run the script using the following command:
 
    ```
