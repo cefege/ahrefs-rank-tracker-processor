@@ -15,6 +15,7 @@ from functools import reduce
 import tldextract
 import streamlit as st
 import random
+import re
 
 
 def rename_csv_files(folder_path):
@@ -52,6 +53,30 @@ def rename_csv_files(folder_path):
                     os.rename(file_path, new_file_path)
 
 
+def extract_date_from_string(date_str):
+    """
+    Extracts the date from a string in the YYYY-MM-DD format.
+
+    Args:
+        date_str (str): The string to extract the date from.
+
+    Returns:
+        str: The extracted date in the YYYY-MM-DD format, or None if the input string is invalid.
+    """
+    # Define a regular expression pattern to match YYYY-MM-DD dates
+    pattern = r"\d{4}-\d{2}-\d{2}"
+
+    # Use the regular expression to search for the date in the string
+    match = re.search(pattern, date_str)
+
+    if match is not None:
+        # If a match is found, extract the matched text and return it
+        return match.group(0)
+    else:
+        # If no match is found, return None
+        return None
+
+
 def add_folder_name_to_csv(folder_path):
     for root, dirs, files in os.walk(folder_path):
         for file in files:
@@ -59,11 +84,16 @@ def add_folder_name_to_csv(folder_path):
                 file_path = os.path.join(root, file)
                 df = pd.read_csv(file_path, sep="\t", encoding="utf-16")
                 folder_name = os.path.basename(root)
+                # extract only date from folder name
+                folder_name = extract_date_from_string(folder_name)
                 df["date_scraped"] = folder_name
                 # convert "date_scraped" column to datetime
                 df["date_scraped"] = pd.to_datetime(df["date_scraped"])
-                # strip from column "position" all non-numeric characters
-                df["Position"] = df["Position"].str.replace(r"\D", "", regex=True)
+                # if column "Position" is string type, convert to int
+                # strip from column "position" all non-numeric characters and convert to int
+                if df["Position"].dtype == "object":
+                    df["Position"] = df["Position"].str.replace(r"\D", "", regex=True)
+                    df["Position"] = df["Position"].astype(int)
                 df.to_csv(file_path, index=False, sep="\t", encoding="utf-16")
 
 
@@ -142,9 +172,8 @@ def calculate_days_between_dates(dates, max_diff):
 
     while i < len(dates) - 1:
         # Calculate the number of days between consecutive dates
-        print("first date: ", dates[i], "second date: ", dates[i + 1], "diff:")
+        # print("first date: ", dates[i], "second date: ", dates[i + 1], "diff:")
         diff = abs((dates[i] - dates[i + 1]).days)
-        print(diff)
         # If the difference is less than the maximum allowed difference, remove the second date and recalculate
         if diff < max_diff:
             dates = np.delete(dates, i + 1)
@@ -161,12 +190,9 @@ def calculate_days_between_dates(dates, max_diff):
 def important_dates_filter(project_df, max_dates):
     # extract the unique "date_scraped" values
     unique_dates = project_df["date_scraped"].unique()
-    print(unique_dates)
 
     #  extract the unique "date_scraped" values
     unique_dates = calculate_days_between_dates(unique_dates, 5)
-
-    print(unique_dates)
 
     # only keep the first 3 elements in the list, if there are more than 3 elements
     # if len(unique_dates) > max_dates:
@@ -214,7 +240,6 @@ def pivot_rank_tracker(df):
 def create_project_reports(folder_path, project_list):
     for project in project_list:
         project_df = merge_csv_files(folder_path, project)
-        # print(project_df, "project_df===")
         project_df = important_dates_filter(project_df, 6)
         project_df = pivot_rank_tracker(project_df)
         # go to up a level and create a folder called "projects" if it doesn't exist
